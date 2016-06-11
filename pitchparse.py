@@ -101,23 +101,23 @@ def parseReview(reviewUrl):
 
         multiDict.append(reviewDict)
 
-        print(type(artistID))
-        print(type(artistName))
-        print(type(reviewID))
-        print(type(albumName))
-        print(type(reviewLink))
-        print(type(albumArtLink))
-        print(type(genreList))
-        print(type(labelList))
-        print(type(releaseYear))
-        print(type(isReissue))
-        print(type(writer))
-        print(type(score))
-        print(type(isBNM))
-        print(type(isBNR))
-        print(type(publishDate))
-        print(type(retrievalTime))
-        print(type(reviewContent))
+        # print(type(artistID))
+        # print(type(artistName))
+        # print(type(reviewID))
+        # print(type(albumName))
+        # print(type(reviewLink))
+        # print(type(albumArtLink))
+        # print(type(genreList))
+        # print(type(labelList))
+        # print(type(releaseYear))
+        # print(type(isReissue))
+        # print(type(writer))
+        # print(type(score))
+        # print(type(isBNM))
+        # print(type(isBNR))
+        # print(type(publishDate))
+        # print(type(retrievalTime))
+        # print(type(reviewContent))
 
     return multiDict
 
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     reviewIndexUrl = 'http://pitchfork.com/reviews/albums/?page='
     # url = 'http://pitchfork.com/reviews/albums/'
     # url = 'http://pitchfork.com/reviews/albums/21673-teens-of-denial/'
-    pageNumber = 1471
+    pageNumber = 1
 
     print('retrieving reviews for ' + reviewIndexUrl + str(pageNumber) + '...')
     reviewPageResponse = requests.get((reviewIndexUrl + str(pageNumber)), headers=ua)
@@ -150,7 +150,33 @@ if __name__ == "__main__":
             reviewDataFrame = reviewDataFrame.append(parsedList)
 
         pageNumber = pageNumber + 1
+        if pageNumber % 100 == 0:
+            try:
+                reviewDataFrame.to_csv('endsample{0}.csv'.format(str(pageNumber)), sep='|')
+            except:
+                print('csv save at ' + pageNumber + ' failed.')
+
+            try:
+                reviewDataFrame.to_pickle('endSample{0}.pkl'.format(str(pageNumber)))
+            except:
+                print('pickle save at ' + pageNumber + ' failed')
+
+            otherDataFrame = reviewDataFrame.pop('reviewContent')
+
+            try:
+                reviewDataFrame.to_csv('endsample{0}xcontent.csv'.format(str(pageNumber)), sep='|')
+            except:
+                print('csv save at ' + pageNumber + ' failed.')
+
+            try:
+                reviewDataFrame.to_pickle('endSample{0}xcontent.pkl'.format(str(pageNumber)))
+            except:
+                print('pickle save at ' + pageNumber + ' failed')
+
+            reviewDataFrame = pd.DataFrame()
+
         reviewPageResponse = requests.get((reviewIndexUrl + str(pageNumber)), headers=ua)
+        print('retrieved page ' + reviewIndexUrl + str(pageNumber))
         print(reviewPageResponse)
 
     reviewDataFrame.to_csv('endsample.csv', sep='|')
