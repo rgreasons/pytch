@@ -128,6 +128,7 @@ if __name__ == "__main__":
     import requests
     import pandas as pd
     from datetime import datetime
+    from datetime import date
 
     ua = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:20.0) Gecko/20100101 Firefox/20.0'}
     reviewDataFrame = pd.DataFrame()
@@ -145,39 +146,54 @@ if __name__ == "__main__":
         reviewList = reviewListSoup.find_all(class_="album-link")
         reviewLinkList = ["http://www.pitchfork.com" + l['href'] for l in reviewList]
         print('reviews on page: ' + str(len(reviewLinkList)))
+
+        failedReviewList = []
         for reviewListURL in reviewLinkList:
-            parsedList = parseReview(reviewListURL)
-            reviewDataFrame = reviewDataFrame.append(parsedList)
+            try:
+                parsedList = parseReview(reviewListURL)
+                reviewDataFrame = reviewDataFrame.append(parsedList)
+            except:
+                failedReviewList.append(reviewListURL)
+                print('retrieving ' + reviewListURL + 'failed')
 
         pageNumber = pageNumber + 1
-        if pageNumber % 100 == 0:
+        if pageNumber % 25 == 0:
             try:
                 reviewDataFrame.to_csv('endsample{0}.csv'.format(str(pageNumber)), sep='|')
             except:
-                print('csv save at ' + pageNumber + ' failed.')
+                print('csv save at ' + str(pageNumber) + ' failed.')
 
             try:
                 reviewDataFrame.to_pickle('endSample{0}.pkl'.format(str(pageNumber)))
             except:
-                print('pickle save at ' + pageNumber + ' failed')
+                print('pickle save at ' + str(pageNumber) + ' failed')
 
             otherDataFrame = reviewDataFrame.pop('reviewContent')
 
             try:
                 reviewDataFrame.to_csv('endsample{0}xcontent.csv'.format(str(pageNumber)), sep='|')
             except:
-                print('csv save at ' + pageNumber + ' failed.')
+                print('csv save at ' + str(pageNumber) + ' failed.')
 
             try:
                 reviewDataFrame.to_pickle('endSample{0}xcontent.pkl'.format(str(pageNumber)))
             except:
-                print('pickle save at ' + pageNumber + ' failed')
+                print('pickle save at ' + str(pageNumber) + ' failed')
 
             reviewDataFrame = pd.DataFrame()
 
         reviewPageResponse = requests.get((reviewIndexUrl + str(pageNumber)), headers=ua)
         print('retrieved page ' + reviewIndexUrl + str(pageNumber))
         print(reviewPageResponse)
+
+    try:
+        f = open('failedreviews.txt', 'w')
+        for failurl in failedReviewList:
+            f.write(failurl + '\n')
+
+        f.close()
+    except:
+        pass
 
     reviewDataFrame.to_csv('endsample.csv', sep='|')
     reviewDataFrame.to_pickle('endSample.pkl')
