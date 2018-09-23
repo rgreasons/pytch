@@ -1,0 +1,175 @@
+---
+title: "Pitchfork Analysis"
+author: "Richard Reasons"
+date: "9/16/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(stringr)
+
+```
+
+```{r}
+pitchfork_cols <- c("review_id", "review_url", "artist_id", "artist", "album_name", "album_art", "score", "isBNM", "isBNR", "GenreList", "LabelList", "release_year", "is_reissue", "writer", "writer_link", "publish_date", "raw_review")
+
+raw_reviews <- read_delim("pitchforkreviews.csv", delim = '|', col_names = pitchfork_cols)
+```
+
+```{r}
+reviews <- raw_reviews %>%
+  mutate(genre_list = gsub("\\[|\\]|'", "", GenreList) %>%
+           str_split(',') %>%
+           map(str_trim),
+         label_list = gsub("\\[|\\]|'", "", LabelList) %>%
+           str_split(',') %>%
+           map(str_trim), 
+         publish_year = year(publish_date), 
+         review = str_replace_all(raw_review, "<(.*?)>", ""),
+         pan = case_when(
+           score <= 2.5 ~ "ravage",
+           score <= 5 ~ "pan",
+           TRUE ~ "normal")) %>%
+  select(-GenreList, -LabelList, -raw_review)
+
+year_counts <- reviews %>%
+  group_by(publish_year) %>%
+  summarise(reviews = n())
+```
+
+```{r}
+reviews %>% 
+  ggplot(aes(publish_year)) +
+  geom_bar() +
+  ggtitle("Pitchfork Reviews by Year") +
+  labs(x = "Review Publish Date", y = "Number of Albums Reviewed") + 
+  scale_x_continuous(breaks = seq(min(reviews$publish_year),
+                                  max(reviews$publish_year), 
+                                  by = 1)) + 
+  scale_y_continuous(expand = c(0,0)) + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text=element_text(family="Helvetica Neue", face = 'bold'),
+        plot.title = element_text(hjust = .5),
+        panel.grid.major.y = element_line(color = "#ff3530"),
+        #axis.line = element_line(color = "#ff3530"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "#ff3530"))
+```
+
+```{r}
+
+genre_colors <- colorRampPalette(colors = c("#d9d9d9", "#ff3530"))(9)
+
+genre_table <- reviews %>%
+  select(genre_list, publish_year, pan) %>%
+  unnest() %>%
+  rename(genre = genre_list) %>%
+  filter(genre != "") 
+
+genre_year_counts <- genre_table %>%
+  group_by(publish_year) %>%
+  summarise(year_count = n())
+```
+
+```{r}
+genre_table %>%
+  group_by(publish_year, genre) %>%
+  summarise(genre_count = n()) %>%
+  left_join(genre_year_counts) %>%
+  mutate(genre_pct = genre_count / year_count) %>%
+  ggplot(aes(publish_year, genre_pct, fill = genre)) +
+  geom_area() + 
+  ggtitle("Pitchfork Review Genre Percentage by Year") +
+  labs(x = "Review Publish Date", y = "Percentage") + 
+  theme_classic() + 
+  scale_fill_brewer(palette = "Set3") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text=element_text(family="Helvetica Neue", face = 'bold'),
+        plot.title = element_text(hjust = .5),
+        panel.grid.major.y = element_line(color = "#ff3530"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "#ff3530"))
+```
+
+```{r}
+genre_table %>%
+  mutate(publish_year = as.character(publish_year)) %>%
+  group_by(publish_year, genre) %>%
+  filter(publish_year %in% c(2005, 2010, 2015) &
+        genre %in% c("Pop/R&B", "Rock", "Rap")) %>%
+  summarise(genre_count = n()) %>%
+  ggplot(aes(publish_year, genre_count, fill = genre)) +
+  geom_col(position = "dodge") + 
+  ggtitle("Change in Pitchfork Reviews of Rock, Rap, \nand Pop Albums over Time") + 
+  labs(x = "Year", y = "Count of Reviews") + 
+  scale_fill_grey() + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text=element_text(family="Helvetica Neue", face = 'bold'),
+        plot.title = element_text(hjust = .5),
+        panel.grid.major.y = element_line(color = "#ff3530"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "#ff3530"))
+```
+
+```{r}
+# reviews %>%
+#   group_by(publish_year, pan) %>%
+#   summarise(pan_count = n()) %>%
+#   left_join(year_counts) %>%
+#   mutate(pan_pct = pan_count / reviews) %>%
+#   ggplot(aes(publish_year, pan_pct, fill = pan)) +
+#   geom_area()  
+
+reviews %>%
+  group_by(publish_year, pan) %>%
+  summarise(pan_count = n()) %>%
+  filter(pan != "normal") %>%
+  ggplot(aes(publish_year, pan_count, linetype = pan)) +
+  geom_line(color = "#ff3530") + 
+  ggtitle("Frequency of Severe Pitchfork Reviews over Time") + 
+  labs(x = "Year", y = "Count of Reviews") + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text=element_text(family="Helvetica Neue", face = 'bold'),
+        plot.title = element_text(hjust = .5),
+        panel.grid.major.y = element_line(color = "#2b2b2b"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "#2b2b2b"))
+```
+
+```{r}
+pans_by_year_genre <- genre_table %>%
+  filter(pan != "normal") %>%
+  group_by(publish_year, genre) %>%
+  summarise(genre_count = n()) 
+
+year_counts_by_genre <- genre_table %>%
+  group_by(publish_year, genre) %>%
+  summarise(genre_year_count = n())
+
+pans_by_year_genre %>%
+  left_join(year_counts_by_genre) %>%
+  mutate(pan_pct = genre_count / genre_year_count) %>%
+  ggplot(aes(publish_year, pan_pct)) + 
+  geom_line(color = "#ff3530") +
+  facet_wrap(~ genre) +
+  ggtitle("Percentage of Reviews Panned per Genre per Year") + 
+  labs(x = "Year", y = "Percentage of Reviews in Genre Panned") + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text=element_text(family="Helvetica Neue", face = 'bold'),
+        plot.title = element_text(hjust = .5),
+        panel.grid.major.y = element_line(color = "#2b2b2b"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "#2b2b2b"))
+```
+
+
+
+
+
